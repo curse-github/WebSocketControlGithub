@@ -18,7 +18,7 @@ var Pinging = false;
 var ipAddr = null;
 
 //WebSocket
-const socketport = "{port you want to host it on}";
+const socketport = "{port}";
 wss = new WebSocket.Server({ port: socketport })
 console.log("Websocket is running on ws://localhost:" + socketport);
 
@@ -39,7 +39,7 @@ wss.on('connection', websocket => {
 							if (turtlealive[index] == false) {
 								minecraftWSs[index] = null;
 								console.log("turtle" + (index + 1) + " disconnected.")
-								browserWS.send("disconnect:turtle:" + (index + 1));
+								browserWS.send("{\"disconnection\":\"" + (index + 1) + "\"}");
 							} else { turtlealive[index] = false; }
 						}
 						Pinging = false;
@@ -49,10 +49,9 @@ wss.on('connection', websocket => {
 		}
 	});
 	websocket.on('message', message => {
-		//console.log(message)
-		message = message.split(':');
-		if (message[0] == "connect") {
-			if (message[1] == "turtle") {
+		var msg = JSON.parse(message);
+		if (msg.type == "connection") {
+			if (msg.connection == "turtle") {
 				var length = minecraftWSs.length;
 				if (length == undefined) { length = 0; }
 				var foundSpace = false;
@@ -67,27 +66,23 @@ wss.on('connection', websocket => {
 					}
 				}
 				if (browserWS != false) {
-					browserWS.send("connection:turtle:" + (parseInt(_id) + 1).toString());
+					browserWS.send("{\"connection\":\"" + (parseInt(_id) + 1) + "\"}");
 				}
-				console.log("Connected to turtle" + (parseInt(_id) + 1).toString() + ".");
-			} else if (message[1] == "browser") {
+				console.log("Connected to turtle" + (parseInt(_id) + 1) + ".");
+			} else if (msg.connection == "browser") {
 				console.log("Connected to browser.");
 				browserWS = websocket;
 				for (let index = 0; index < minecraftWSs.length; index++) {
-					if (minecraftWSs[index] != null) { browserWS.send("connection:turtle:" + (index + 1)); }
+					if (minecraftWSs[index] != null) { browserWS.send("{\"connection\":\"" + (index + 1) + "\"}"); }
 				}
 			}
-		} else if (message[0] == "turtle") {
-			var cmd = message[2];
-			for (let index = 3; index < message.length; index++) { cmd = cmd + ":" + message[index]; }
-			if (minecraftWSs[parseInt(message[1]) - 1] != null) { minecraftWSs[parseInt(message[1]) - 1].send(cmd); }
-		} else if (message[0] == "id") {
-			var cmd = message[0];
-			for (let index = 1; index < message.length; index++) { cmd = cmd + ":" + message[index]; }
-			browserWS.send(cmd);
-		} else if (message[0] == "reply") {
-			turtlealive[parseInt(message[1])] = true;
-			console.log("turtle" + (parseInt(message[1]) + 1) + " is alive.")
+		} else if (msg.type == "send") {
+			if (minecraftWSs[msg.turtle - 1] != null) { minecraftWSs[msg.turtle - 1].send(msg.cmd); }
+		} else if (msg.type == "return") {
+			browserWS.send(message);
+		} else if (msg.type = "reply") {
+			turtlealive[msg.id] = true;
+			console.log("turtle" + (parseInt(msg.id)+1) + " is alive.")
 		}
 	});
 })

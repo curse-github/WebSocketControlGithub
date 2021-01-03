@@ -10,7 +10,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 
 var material = new THREE.MeshBasicMaterial({ color: 0xc00030, transparent: true, opacity: 0.5 });
 const lineMaterial = new THREE.LineBasicMaterial({ color: 0xa8002a });
-const TurtleMat = new THREE.MeshBasicMaterial({ map: TextureLoader().load("textures/turtle.png") });
+const TurtleMat = new THREE.MeshBasicMaterial({ map: new TextureLoader().load("textures/turtle.png") });
 TurtleMat.map.magFilter = THREE.NearestFilter;
 
 animate();
@@ -26,86 +26,76 @@ var blocks = []
 var blockDirections = []
 
 var returnNum;
-
-ws = new WebSocket("ws://{ipAddr}:58742");
+//change {port} to a number but leave {ipAddr} as it is
+ws = new WebSocket("ws://{ipAddr}:{port}");
 ws.onopen = function () {
     document.getElementById("status").innerHTML = "Connected!!";
-    ws.send("connect:browser");
+    ws.send("{\"type\":\"connection\",\"connection\":\"browser\"}");
     setonmessage();
 };
 ws.onerror = function (error) { console.log("WebSocket error: " + error); };
 
 function setonmessage() {
     ws.onmessage = function (event) {
-        var msg = event.data.split(":");
-        //console.log(msg);
-        if (msg[0] == "connection") {
-            if (msg[1] = "turtle") {
-                console.log("Adding turtle" + msg[2] + ".");
-                document.getElementById("selectTurtle").innerHTML = document.getElementById("selectTurtle").innerHTML + "<option value=\"" + msg[2] + "\">turtle" + msg[2] + "</option>";
-                curid = document.getElementById("selectTurtle").value;
-                var loader = new OBJLoader2();
-                loader.load("model/turtle.obj", function (object) {
-                    //fix scale
-                    object.scale.set(0.25, 0.25, 0.25);
-                    //fix textures
-                    object.traverse(function (child) {
-                        if (child instanceof THREE.Mesh) { child.material = TurtleMat; }
-                    });
-                    turtles[msg[2]].model = object;
-                    turtles[msg[2]].model.position.set(0, 0, 0);
-                    turtles[msg[2]].model.name = "turtle" + msg[2];
-                    if (curid == msg[2]) { scene.add(turtles[msg[2]].model); }
+        var msg = JSON.parse(event.data);
+        if (msg.connection != null) {
+            console.log("Adding turtle" + msg.connection + ".");
+            document.getElementById("selectTurtle").innerHTML = document.getElementById("selectTurtle").innerHTML + "<option value=\"" + msg.connection + "\">turtle" + msg.connection + "</option>";
+            curid = document.getElementById("selectTurtle").value;
+            var loader = new OBJLoader2();
+            loader.load("model/turtle.obj", function (object) {
+                object.scale.set(0.25, 0.25, 0.25);
+                object.traverse(function (child) {
+                    if (child instanceof THREE.Mesh) { child.material = TurtleMat; }
                 });
-                turtles[msg[2]] = {
-                    x: 0,
-                    y: 0,
-                    z: 0,
-                    d: 0,
-                    name: "turtle" + msg[2],
-                    curIntrvlId: null,
-                    canAct: true,
-                    _return: {},
-                    _evntNm: null,
-                    model: null,
-                    offset: 0
-                };
-                if (forceNames) { luaCmd(msg[2], "os.setComputerLabel('turtle" + msg[2] + "')", "os.setComputerLabel('turtle" + msg[2] + "')", "false"); }
-                luaCmd(msg[2], "os.getComputerLabel()", "os.getComputerLabel()", "name");
-                if (curid == msg[2]) { turtles[curid].canAct = false; UpdateBlcks(); }
-            }
-        }
-        else if (msg[0] == "disconnect") {
-            if (msg[1] == "turtle") {
-                if (turtles[msg[2]] != null) {
-                    console.log("Turtle" + msg[2] + " disconnected.");
-                    html = document.getElementById("selectTurtle").innerHTML.replace("<option value=\"" + msg[2] + "\">" + turtles[msg[2]].name + "</option>", "");
-                } else { html = document.getElementById("selectTurtle").innerHTML.replace("<option value=\"" + msg[2] + "\">" + "turtle" + msg[2] + "</option>", ""); }
-                document.getElementById("selectTurtle").innerHTML = html;
-                if (blocks[msg[2]] != null) {
-                    for (let index = 0; index < blocks[msg[2]].length; index++) {
-                        pos = blocks[msg[2]][index].split(", ");
-                        worlds[msg[2]] = null;
-                        blockDirections[msg[2]] = null;
-                        if (scene.getObjectByName("Cube, " + pos[0] + ", " + pos[1] + ", " + pos[2]) != null) {
-                            scene.remove(scene.getObjectByName("Cube, " + pos[0] + ", " + pos[1] + ", " + pos[2]));
-                            if (scene.getObjectByName("Line, " + pos[0] + ", " + pos[1] + ", " + pos[2]) != null) { scene.remove(scene.getObjectByName("Line, " + pos[0] + ", " + pos[1] + ", " + pos[2])); }
-                        }
-                    }
-                    blocks[msg[2]] = null;
-                    if (turtles[msg[2]] != null) {
-                        scene.remove(turtles[msg[2]].model);
-                        updateCameraPos(turtles[msg[2]].x, turtles[msg[2]].y, turtles[msg[2]].z, 0, 0, 0);
-                        turtles[msg[2]] = null;
-                    }
-                }
-                curid = document.getElementById("selectTurtle").value;
+                turtles[msg.connection].model = object;
+                turtles[msg.connection].model.position.set(0, 0, 0);
+                turtles[msg.connection].model.name = "turtle" + msg.connection;
+                if (curid == msg.connection) { scene.add(turtles[msg.connection].model); }
+            });
+            turtles[msg.connection] = {
+                x: 0,
+                y: 0,
+                z: 0,
+                d: 0,
+                name: "turtle" + msg.connection,
+                curIntrvlId: null,
+                canAct: true,
+                _return: {},
+                _evntNm: null,
+                model: null,
+                offset: 0
+            };
+            if (forceNames) { luaCmd(msg.connection, "os.setComputerLabel('turtle" + msg.connection + "')", "os.setComputerLabel('turtle" + msg.connection + "')", "false"); }
+            luaCmd(msg.connection, "os.getComputerLabel()", "os.getComputerLabel()", "name");
+            if (curid == msg.connection) { turtles[curid].canAct = false; UpdateBlcks(); }
+        } else if (msg.disconnection != null) {
+            if (turtles[msg.disconnection] != null) {
+                console.log("Turtle" + msg.disconnection + " disconnected.");
+                html = document.getElementById("selectTurtle").innerHTML.replace("<option value=\"" + msg.disconnection + "\">" + turtles[msg.disconnection].name + "</option>", "");
 
+                document.getElementById("selectTurtle").innerHTML = html;
+                if (blocks[msg.disconnection] != null) {
+                    for (let index = 0; index < blocks[msg.disconnection].length; index++) {
+                        pos = blocks[msg.disconnection][index].split(", ");
+                        worlds[msg.disconnection] = null;
+                        blockDirections[msg.disconnection] = null;
+                        if (scene.getObjectByName("Cube, " + blocks[msg.disconnection][index]) != null) { scene.remove(scene.getObjectByName("Cube, " + blocks[msg.disconnection][index])); }
+                        if (scene.getObjectByName("Line, " + blocks[msg.disconnection][index]) != null) { scene.remove(scene.getObjectByName("Line, " + blocks[msg.disconnection][index])); }
+                    }
+                    blocks[msg.disconnection] = null;
+                }
+                scene.remove(turtles[msg.disconnection].model);
+                updateCameraPos(turtles[msg.disconnection].x, turtles[msg.disconnection].y, turtles[msg.disconnection].z, 0, 0, 0);
+                turtles[msg.disconnection] = null;
+
+
+                curid = document.getElementById("selectTurtle").value;
                 if (blocks[curid] != null) {
                     for (let index = 0; index < blocks[curid].length; index++) {
                         pos = blocks[curid][index].split(", ");
                         if (blockDirections[curid][pos[0]][pos[1]][pos[2]] != null) {
-                            var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]].split("/"));
+                            var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
                         } else { var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], null); }
                         cube[0].position.x = pos[0];
                         cube[0].position.y = pos[1];
@@ -130,32 +120,28 @@ function setonmessage() {
                     UpdateBlcks();
                 }
             }
-        }
-        else if (msg[0] == "id") {
-            var id = msg[1];
-            if (msg[2] == "name") {
+        } else if (msg.rtrnTyp != null) {
+            var id = msg.id;
+            if (msg.rtrnTyp == "name") {
                 var name = "turtle" + id;
-                if (msg[3].split(", ")[0] != "nil") { name = "\"" + msg[3].split(", ")[0] + "\""; }
+                if (msg.return.split(", ")[0] != "nil") { name = "\"" + msg.return.split(", ")[0] + "\""; }
                 document.getElementById("selectTurtle").innerHTML = document.getElementById("selectTurtle").innerHTML.replace(turtles[id].name, name);
                 turtles[id].name = name;
-            } else if (msg[4] == "evntNm") {
-                if (msg[2] == "return") {
-                    turtles[id]._evntNm = msg[5];
-                    turtles[id]._return = msg[3].split(", ");
-                    if (turtles[id]._return[0] == "true") {
-                        console.log(msg[5] + " succeded!");
-                    } else if (turtles[id]._return[0] == "false") {
-                        console.log(msg[5] + " failed.");
-                    } else {
-                        JSON.parse();
-                        console.log(msg[5] + " returned: " + msg[3] + ".");
-                    }
+            } else if (msg.rtrnTyp == "return") {
+                turtles[id]._evntNm = msg.evntNm;
+                turtles[id]._return = msg.return.split(", ");
+                if (turtles[id]._return[0] == "true") {
+                    console.log(msg.evntNm + " succeded!");
+                } else if (turtles[id]._return[0] == "false") {
+                    console.log(msg.evntNm + " failed.");
+                } else {
+                    console.log(msg.evntNm + " returned: " + msg.return + ".");
+                }
 
-                } else if (msg[2] == "returnSilent") {
-                    turtles[id]._evntNm = msg[5];
-                    turtles[id]._return = msg[3].split(", ");
-                } else if (msg[2] == "customReturn") { console.log(msg[5] + " returned: " + msg[3] + "."); }
-            }
+            } else if (msg.rtrnTyp == "returnSilent") {
+                turtles[id]._evntNm = msg.evntNm;
+                turtles[id]._return = msg.return.split(", ");
+            } else if (msg.rtrnTyp == "customReturn") { console.log(msg.evntNm + " returned: " + msg.return + "."); }
         }
     }
 }
@@ -163,17 +149,17 @@ function setonmessage() {
 
 
 function luaCmd(id, cmd, _eventName, returnType) {
-    ws.send("turtle:" + id + ":{\"type\":\"lua\", \"cmd\":\"" + cmd + "\",\"id\":\"" + id + "\", \"evntNm\":\"" + _eventName + "\", \"rtrnTyp\":\"" + returnType + "\"}");
+    ws.send("{\"type\":\"send\", \"turtle\":\"" + id + "\", \"cmd\":\"{\\\"type\\\":\\\"lua\\\", \\\"cmd\\\":\\\"" + cmd + "\\\",\\\"id\\\":\\\"" + id + "\\\", \\\"evntNm\\\":\\\"" + _eventName + "\\\", \\\"rtrnTyp\\\":\\\"" + returnType + "\\\"}\"}");
 }
 function luaCmdReturn(cmd, _eventName, returnType, callback) {
-    ws.send("turtle:" + curid + ":{\"type\":\"lua\", \"cmd\":\"" + cmd + "\",\"id\":\"" + curid + "\", \"evntNm\":\"" + _eventName + "\", \"rtrnTyp\":\"" + returnType + "\"}");
+    ws.send("{\"type\":\"send\", \"turtle\":\"" + curid + "\", \"cmd\":\"{\\\"type\\\":\\\"lua\\\", \\\"cmd\\\":\\\"" + cmd + "\\\",\\\"id\\\":\\\"" + curid + "\\\", \\\"evntNm\\\":\\\"" + _eventName + "\\\", \\\"rtrnTyp\\\":\\\"" + returnType + "\\\"}\"}");
     if (_eventName != "false" && returnType != "false") {
         obj = { return: null };
         checkreturn(_eventName, 100, curid, true, callback);
     } else { return true; }
 }
 function luaCmdReturnSpecific(id, cmd, _eventName, returnType, callback) {
-    ws.send("turtle:" + id + ":{\"type\":\"lua\", \"cmd\":\"" + cmd + "\",\"id\":\"" + id + "\", \"evntNm\":\"" + _eventName + "\", \"rtrnTyp\":\"" + returnType + "\"}");
+    ws.send("{\"type\":\"send\", \"turtle\":\"" + id + "\", \"cmd\":\"{\\\"type\\\":\\\"lua\\\", \\\"cmd\\\":\\\"" + cmd + "\\\",\\\"id\\\":\\\"" + id + "\\\", \\\"evntNm\\\":\\\"" + _eventName + "\\\", \\\"rtrnTyp\\\":\\\"" + returnType + "\\\"}\"}");
     if (_eventName != "false" && returnType != "false") {
         obj = { return: null };
         checkreturn(_eventName, 100, id, true, callback);
@@ -220,7 +206,7 @@ function getCube(BlkId, dir) {
             //create textures for each side
             var leftTex = new TextureLoader().load(getTexLeft[BlkId])
             var rightTex = new TextureLoader().load(getTexRight[BlkId])
-            if (dir != null && dir[1] != null && dir[1] == "true") {
+            if (dir != null && (dir == "x" || dir == "y" || dir == "z")) {
                 leftTex.center = new THREE.Vector2(0.5, 0.5); leftTex.rotation = THREE.Math.degToRad(90);
                 rightTex.center = new THREE.Vector2(0.5, 0.5); rightTex.rotation = THREE.Math.degToRad(90);
             }
@@ -233,16 +219,19 @@ function getCube(BlkId, dir) {
             materials = [leftMaterial, rightMaterial, topMaterial, bottomMaterial, frontMaterial, backMaterial]
             //create mesh
             block = new THREE.Mesh(cubeGeometry, materials);
-            if (dir != null && dir[0] != null) {
+            if (dir != null) {
                 var x = 0;
                 var y = 0;
                 var z = 0;
-                switch (dir[0]) {
+                switch (dir) {
                     case "north": y = turtles[curid].offset; break;
                     case "east": y = 1 + turtles[curid].offset; break;
                     case "south": y = 2 + turtles[curid].offset; break;
                     case "west": y = 3 + turtles[curid].offset; break;
                     case "up": x = 1; break;
+                    case "x": y = 1 + turtles[curid].offset; break;
+                    case "y": x = 1; break;
+                    case "z": y = turtles[curid].offset; break;
                     default: console.log("Direction not supported yet."); break;
                 }
                 y = (y + 4) % 4;
@@ -342,17 +331,17 @@ function updateTurtlePos(id) {
     turtles[id].model.rotation.y = (-(Math.PI / 2) * turtles[id].d) - (Math.PI / 2);
 }
 function UpdateBlcks() {
-    luaCmdReturn("turtle.inspectUp()", "Get block up", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+    luaCmdReturn("turtle.inspectUp()", "Get block up", "returnSilent", function (returnVal, id) {
         if (returnVal != null) {
             if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                 setBlockDir("up", returnVal[1], id);
             } else { setBlockDir("up", "minecraft|air", id); }
-            luaCmdReturnSpecific(id, "turtle.inspectDown()", "Get block down", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+            luaCmdReturnSpecific(id, "turtle.inspectDown()", "Get block down", "returnSilent", function (returnVal, id) {
                 if (returnVal != null) {
                     if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                         setBlockDir("down", returnVal[1], id);
-                    } else { etBlockDir("down", "minecraft|air", id); }
-                    luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                    } else { setBlockDir("down", "minecraft|air", id); }
+                    luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
                         if (returnVal != null) {
                             if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                                 setBlockDir("forward", returnVal[1], id);
@@ -362,7 +351,7 @@ function UpdateBlcks() {
                                     if (returnVal[0] = "true") {
                                         turtles[id].d = (turtles[id].d + 5) % 4;
                                         updateTurtlePos(id);
-                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
                                             if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                                                 setBlockDir("forward", returnVal[1], id);
                                             } else { setBlockDir("forward", "minecraft|air", id); }
@@ -371,7 +360,7 @@ function UpdateBlcks() {
                                                     if (returnVal[0] = "true") {
                                                         turtles[id].d = (turtles[id].d + 5) % 4;
                                                         updateTurtlePos(id);
-                                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
                                                             if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                                                                 setBlockDir("forward", returnVal[1], id);
                                                             } else { setBlockDir("forward", "minecraft|air", id); }
@@ -380,7 +369,7 @@ function UpdateBlcks() {
                                                                     if (returnVal[0] = "true") {
                                                                         turtles[id].d = (turtles[id].d + 5) % 4;
                                                                         updateTurtlePos(id);
-                                                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                                                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
                                                                             if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                                                                                 setBlockDir("forward", returnVal[1], id);
                                                                             } else { setBlockDir("forward", "minecraft|air", id); }
@@ -431,43 +420,36 @@ function setOffset() {
         var z = turtles[curid].z;
         var d = turtles[curid].d;
         var isNull = true;
+        //make sure there is a block one block forward and one block down
         switch (d) {
-            case 0: isNull = (worlds[curid][x][y][z - 1] == null); break;
-            case 1: isNull = (worlds[curid][x - 1][y][z] == null); break;
-            case 2: isNull = (worlds[curid][x][y][z + 1] == null); break;
-            case 3: isNull = (worlds[curid][x + 1][y][z] == null); break;
+            case 0: if (worlds[curid][x] != null && worlds[curid][x][y - 1] != null && worlds[curid][x][z - 1] != null) { isNull = (worlds[curid][x][y - 1][z - 1] == null); } break;
+            case 1: if (worlds[curid][x - 1] != null && worlds[curid][x - 1][y - 1] != null && worlds[curid][x - 1][z] != null) { isNull = (worlds[curid][x - 1][y - 1][z] == null); } break;
+            case 2: if (worlds[curid][x] != null && worlds[curid][x][y - 1] != null && worlds[curid][x][z + 1] != null) { isNull = (worlds[curid][x][y - 1][z + 1] == null); } break;
+            case 3: if (worlds[curid][x + 1] != null && worlds[curid][x + 1][y - 1] != null && worlds[curid][x + 1][z] != null) { isNull = (worlds[curid][x + 1][y - 1][z] == null); } break;
         }
         if (!isNull) {
-            luaCmdReturn("turtle.inspect()", "Get block", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+            luaCmdReturn("turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
                 if (returnVal != null) {
                     if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                         var BlkId = returnVal[1].replaceAll("|", ":");
                         json = JSON.parse(BlkId);
                         if (facingOffsets[json.name]) {
+                            //calculate offset
                             var _offset;
                             switch (json.state.facing) {
-                                case "north": _offset = 0; break;
-                                case "east": _offset = 1; break;
-                                case "south": _offset = 2; break;
-                                case "west": _offset = 3; break;
+                                case "north": _offset = ((d - (facingOffsets[json.name])) + 4) % 4; break;
+                                case "east": _offset = ((d - (1 + facingOffsets[json.name])) + 4) % 4; break;
+                                case "south": _offset = ((d - (2 + facingOffsets[json.name])) + 4) % 4; break;
+                                case "west": _offset = ((d - (3 + facingOffsets[json.name])) + 4) % 4; break;
                                 default: console.log("Direction not supported."); return;
                             }
-                            //this is the way the player is facing
-                            _offset += facingOffsets[json.name];
-                            _offset = d - _offset;
-                            switch (_offset) {
-                                case -3: _offset = 1; break;
-                                case -2: _offset = 2; break;
-                                case -1: _offset = 3; break;
-                            }
-                            _offset = (_offset + 4) % 4;
-                            turtles[id].offset = _offset;
+                            //rerender the scene with correct rotation
                             rerender();
                         } else { console.log("Not a valid block."); }
-                    } else { console.log("Not a valid block."); }
+                    } else { console.log("There is not a block in front of the Turtle."); }
                 } else { console.log("Turtle took too long to respond."); }
             });
-        }
+        } else { console.log("Invalid block placement."); }
     }
 }
 function setCurTurtle(value) {
@@ -484,7 +466,7 @@ function setCurTurtle(value) {
         for (let index = 0; index < blocks[value].length; index++) {
             pos = blocks[value][index].split(", ");
             if (blockDirections[curid][pos[0]][pos[1]][pos[2]] != null) {
-                var cube = getCube(worlds[value][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]].split("/"));
+                var cube = getCube(worlds[value][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
             } else { var cube = getCube(worlds[value][pos[0]][pos[1]][pos[2]], null); }
             cube[0].position.x = pos[0];
             cube[0].position.y = pos[1];
@@ -522,10 +504,10 @@ function setBlock(x, y, z, BlkId, trtlId, direction) {
     }
     //remove block from worlds array
     object1 != null && object2 != null ? function () { if (worlds[trtlId] != null) { worlds[trtlId][x][y][z] = null } } : false;
+    //place new block
     if (BlkId != "minecraft:air" && !irrelevantBlocks.includes(BlkId)) {
-        //create new block
         if (direction != null) {
-            var cube = getCube(BlkId, direction.split("/"));
+            var cube = getCube(BlkId, direction);
         } else { var cube = getCube(BlkId, direction); }
         cube[0].position.x = x;
         cube[0].position.y = y;
@@ -568,17 +550,10 @@ function setBlockDir(dir, id, trtlId) {
             BlkId = json.name + "/type:" + json.state.type;
         } else {
             BlkId = json.name;
-        }
-        if (json.state != null) {
+        } if (json.state != null) {
             if (json.state.facing != null) {
-                direction = json.state.facing + "/false";
-            } else if (json.state.axis != null) {
-                switch (json.state.axis) {
-                    case "x": direction = "east/true"; break;
-                    case "y": direction = "up/true"; break;
-                    case "z": direction = "north/true"; break;
-                }
-            }
+                direction = json.state.facing;
+            } else if (json.state.axis != null) { direction = json.state.axis; }
         }
     }
     x = turtles[trtlId].x;
@@ -699,7 +674,7 @@ function digUp() {
         turtles[curid].canAct = false;
         luaCmdReturn("turtle.digUp()", "Dig", "return", function (returnVal, id) {
             if (returnVal != null && returnVal[0] == "true") {
-                luaCmdReturnSpecific(id, "turtle.inspectUp()", "Get block up", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                luaCmdReturnSpecific(id, "turtle.inspectUp()", "Get block up", "returnSilent", function (returnVal, id) {
                     if (returnVal != null) {
                         if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                             setBlockDir("up", returnVal[1], id);
@@ -716,7 +691,7 @@ function dig() {
         turtles[curid].canAct = false;
         luaCmdReturn("turtle.dig()", "Dig forward", "return", function (returnVal, id) {
             if (returnVal != null && returnVal[0] == "true") {
-                luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
                     if (returnVal != null) {
                         if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                             setBlockDir("forward", returnVal[1], id);
@@ -733,7 +708,7 @@ function digDown() {
         turtles[curid].canAct = false;
         luaCmdReturn("turtle.digDown()", "Dig", "return", function (returnVal, id) {
             if (returnVal != null && returnVal[0] == "true") {
-                luaCmdReturnSpecific(id, "turtle.inspectDown()", "Get block down", "returnSilent\":\"arryIndx\":\"name", function (returnVal, id) {
+                luaCmdReturnSpecific(id, "turtle.inspectDown()", "Get block down", "returnSilent", function (returnVal, id) {
                     if (returnVal != null) {
                         if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                             setBlockDir("down", returnVal[1], id);
@@ -761,7 +736,7 @@ function rerender() {
         for (let index = 0; index < blocks[curid].length; index++) {
             pos = blocks[curid][index].split(", ");
             if (blockDirections != null) {
-                var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]].split("/"));
+                var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
             } else { var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], null); }
             cube[0].position.x = pos[0];
             cube[0].position.y = pos[1];
@@ -779,13 +754,12 @@ function rerender() {
             }
         }
     }
+    //add turtle model back into the scene
     turtles[curid].model.position.set(turtles[curid].x, turtles[curid].y, turtles[curid].z);
     scene.add(turtles[curid].model);
-    updateCameraPos(turtles[curid].x, turtles[curid].y, turtles[curid].z, turtles[curid].x, turtles[curid].y, turtles[curid].z);
-    turtles[curid].canAct = false;
-    UpdateBlcks();
 }
 function animate() {
+    //every rerender the scene every frame
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
 }

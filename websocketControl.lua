@@ -5,18 +5,17 @@ function prepare(val)
         returnVal = string.gsub(returnVal,":","|")
         returnVal = string.gsub(returnVal,"\n","")
         returnVal = string.gsub(returnVal," ","")
+        returnVal = string.gsub(returnVal,"\"","\\\"")
         return returnVal
-    else 
-        return tostring(val)
-    end
+    else  return tostring(val) end
 end
 
-ws, err = http.websocket("ws://{ip address of the server}:{port youre hosting it on}")
+ws, err = http.websocket("ws://{ip of server}:{port}")
 if ws ~= false then
     shell.run("clear")
     write("CraftOS 1.8\n> _\n")
     
-    ws.send("connect:turtle")
+    ws.send("{\"type\":\"connection\",\"connection\":\"turtle\"}")
     while true do
         message = ws.receive()
         obj = json.decode(message.."\n")
@@ -26,13 +25,10 @@ if ws ~= false then
             setfenv(func, getfenv())
             func()
             if obj.rtrnTyp ~= "false" then
-                msg = "id:"..obj.id..":"..obj.rtrnTyp..":"..prepare(output[0])..", "..prepare(output[1])..", "..prepare(output[2])..":evntNm:"..obj.evntNm
-                ws.send(msg)
+                ws.send("{\"type\":\"return\", \"id\":\""..obj.id.."\", \"rtrnTyp\":\""..obj.rtrnTyp.."\", \"return\":\""..prepare(output[0])..", "..prepare(output[1])..", "..prepare(output[2]).."\", \"evntNm\":\""..obj.evntNm.."\"}")
             end
         else
-            ws.send("reply:"..obj.id)
+            ws.send("{\"type\":\"reply\", \"id\":\""..obj.id.."\"}")
         end
     end
-else 
-    write(err.."\n")
-end
+else write(err.."\n") end
