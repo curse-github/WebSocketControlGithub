@@ -1,0 +1,75 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <style>
+        body { background-color: rgb(75, 75, 75); margin: 0; }
+        h2 { text-align: center; }
+        up { margin-left: 12px }
+        turnLeft { margin-left: 18px; }
+        turnRight { margin-left: -4px; }
+        dig {word-spacing: -4px;}
+        dig {word-spacing: -4px;}
+    </style>
+    <h2>Remote control turtles!!</h2>
+    <script src="js/three.js"></script>
+    <script src="js/OrbitControls.js"></script>
+
+    <div id="OBJLoader">
+        <script src="js/OBJLoader/OBJLoader2.js"></script>
+        <script src="js/OBJLoader/OBJLoader2Parser.js"></script>
+        <script src="js/OBJLoader/MeshReceiver.js"></script>
+        <script src="js/OBJLoader/MaterialHandler.js"></script>
+    </div>
+    <div id="TextureLoader">
+        <script src="js/TextureLoader/Cache.js"></script>
+        <script src="js/TextureLoader/constants.js"></script>
+        <script src="js/TextureLoader/ImageLoader.js"></script>
+        <script src="js/TextureLoader/Loader.js"></script>
+        <script src="js/TextureLoader/LoadingManager.js"></script>
+        <script src="js/TextureLoader/Texture.js"></script>
+        <script src="js/TextureLoader/TextureLoader.js"></script>
+        <script src="js/SceneUtils.js"></script>
+    </div>
+
+    <script src="js/tools.js"></script>
+    <script src="js/Main.js"></script>
+</head>
+
+<body>
+    <div id="input">
+        <label for="turtles">Choose a turtle:</label>
+        <select onchange="setCurTurtle(this.value);" name="turtles" , id="selectTurtle"></select>
+        &nbsp &nbsp
+        <label for="forceNames">Force names: </label>
+        <input type="checkbox" , onchange="setForceNames(this.checked);" ,
+            name="forceNames"></input>
+        <div id="status">Connecting...</div>
+        <br>
+        <input type="text" , id="cmd" , value="turtle.dig()"></input><input type="button" , value="Execute code" ,
+            onclick="luaCmd(curid, document.getElementById('cmd').value, document.getElementById('cmd').value, 'customReturn')"></input>
+        <input type="text" , id="setNm" , value="turtle"></input><input type="button" , value="Set name", onclick="if (!forceNames && curid != 'all') {
+            luaCmd(curid, 'os.setComputerLabel(\'' + document.getElementById('setNm').value + '\')', 'os.setComputerLabel(\'' + document.getElementById('setNm').value + '\'), \'return\'');
+            luaCmd(curid, 'os.getComputerLabel()', 'os.getComputerLabel()', 'name');
+            curid = document.getElementById('selectTurtle').value;
+        }"></input><input type="button" , value="Clear name", onclick="if (!forceNames && curid != 'all') {
+            luaCmd(curid, 'os.setComputerLabel(nil)', 'os.setComputerLabel(nil), \'return\'');
+            luaCmd(curid, 'os.getComputerLabel()', 'os.getComputerLabel()', 'name');
+            curid = document.getElementById('selectTurtle').value;
+        }"></input>
+        <br>
+        <input type="button" , id="forward" value="Move forward" , onclick="forward()">
+        <up><input type="button" , id="up" value="Move up" , onclick="up()"></up>
+        <turnLeft><input type="button" , id="turnLeft" value="Turn left" , onclick="turnLeft()"></turnLeft>
+        <turnRight><input type="button" , id="turnRight" value="Turn right" , onclick="turnRight()"></turnRight>
+        <br>
+        <input type="button" , id="back" value="Move backward" , onclick="back()">
+        <input type="button" , id="down" value="Move down" , onclick="down()">
+        <dig><input type="button" , id="digDown" value="Dig down" , onclick="digDown()">
+        <input type="button" , id="dig" value="Dig forward" , onclick="dig()">
+        <input type="button" , id="digUp" value="Dig up" , onclick="digUp()"></dig>
+        
+    </div>
+</body>
+
+</html>

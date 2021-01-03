@@ -1,0 +1,144 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+	<h2>Remote control turtles!!</h2>
+	<script>
+		var numTurtles = 0;
+		var connectedTurtles = [];
+		var forceNames = false;
+
+		ws = new WebSocket("ws://{ipAddr}:8837");
+		ws.onopen = function () {
+			document.getElementById("status").innerHTML = "Connected!!";
+			startup();
+		};
+		ws.onerror = function (error) {
+			console.log('WebSocket error: ' + error);
+		};
+
+		function startup() {
+			ws.send("connect:browser");
+			setonmessage();
+		}
+
+		function setonmessage() {
+			ws.onmessage = function (event) {
+				var msg = event.data.split(":");
+				console.log(msg);
+				if (msg[0] == "connection") {
+					if (msg[1] = "turtle") {
+						connectedTurtles[parseInt(msg[2])] = true;
+
+						console.log("adding turtle" + msg[2])
+						document.getElementById("input").innerHTML = document.getElementById("input").innerHTML + "<div id=\"turtle" + msg[2] + "\"></div>";
+						document.getElementById("turtle" + msg[2]).innerHTML = "<div id=\"name" + msg[2] + "\"><b>turtle" + msg[2] + "</b></div>" +
+							"<div id=\"return" + msg[2] + "\">Return goes here.</div>" +
+							"<p style=\"margin-left: 20px\">" +
+							"<input type=\"button\", id=\"forward\", value=\"Move forward\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'turtle.forward()', 'Move forward')\"></input>" +
+							"<input type=\"button\", id=\"up\", value=\"Move up\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'turtle.up()', 'Move up')\"></input>" +
+							"</p>" +
+							"<input type=\"button\", id=\"turnLeft\", value=\"Turn left\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'turtle.turnLeft()', 'Turn left')\"></input>" +
+							"<input type=\"button\", id=\"turnRight\", value=\"Turn right\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'turtle.turnRight()', 'Turn right')\"></input>" +
+							"<p style=\"margin-left: 15px\">" +
+							"<input type=\"button\", id=\"back\", value=\"Move backward\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'turtle.back()', 'Move backward')\"></input>" +
+							"<input type=\"button\", id=\"down\", value=\"Move down\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'turtle.down()', 'Move down')\"></input>" +
+							"</p>" +
+							"<input type=\"text\", id=\"cmd" + msg[2] + "\", value=\"turtle.dig()\"></input>" +
+							"<input type=\"button\", value=\"Execute code\", onclick=\"luaCmd('turtle:" + msg[2] + "', document.getElementById('cmd" + msg[2] + "').value, document.getElementById('cmd" + msg[2] + "').value)\"></input>" +
+							"<br>" +
+							"<input type=\"text\", id=\"setNm" + msg[2] + "\", value=\"turtle" + msg[2] + "\"></input>" +
+							"<input type=\"button\", value=\"Set name\", onclick=\"luaCmd('turtle:" + msg[2] + "', 'os.setComputerLabel(\\\'' + document.getElementById('setNm" + msg[2] + "').value + '\\\')', 'false'); luaCmd('turtle:" + msg[2] + "', 'os.getComputerLabel()', 'os.getComputerLabel()')\"></input>" +
+							"</div>";
+						numTurtles++;
+						if (forceNames) {
+							luaCmd("turtle:" + msg[2], "os.setComputerLabel('turtle" + msg[2] + "')", "false");
+							
+						}
+						else {
+							updateName(msg[2]);
+						}
+					}
+				}
+				else if (msg[0] == "disconnect") {
+					if (msg[1] == "turtle") {
+						document.getElementById("turtle" + msg[2]).innerHTML = "";
+						document.getElementById("input").innerHTML = document.getElementById("input").innerHTML.replace("<div id=\"turtle" + msg[2] + "\"></div>", "");
+					}
+				}
+				else if (msg[0] == "id") {
+					var id = msg[1]
+					if (msg[2] == "name") {
+						if (msg[3] != "'none'") {
+							document.getElementById("name" + id).innerHTML = "<b>" + msg[3] + "</b>";
+						}
+					}
+					else if (msg[2] == "return") {
+						if (msg[4] == "evntNm") {
+							if (msg[3] == "true") {
+								document.getElementById("return" + id).innerHTML = (msg[5] + " succeded!!");
+							}
+							else if (msg[3] == "false") {
+								document.getElementById("return" + id).innerHTML = (msg[5] + " failed.");
+							}
+							else {
+								document.getElementById("return" + id).innerHTML = (msg[5] + " returned: " + msg[3]);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		function luaCmd(_id, cmd, _eventName) {
+			if (_id.split(":")[1] != "all") {
+				ws.send(_id + ":{\"type\":\"lua\", \"cmd\":\"" + cmd + "\",\"id\":\"" + _id.split(":")[1] + "\", \"evntNm\":\"" + _eventName + "\"}");
+			}
+			else {
+				for (let index = 1; index < numTurtles + 1; index++) {
+					ws.send("turtle:" + index + ":{\"type\":\"lua\", \"cmd\":\"" + cmd + "\",\"id\":\"" + index + "\", \"evntNm\":\"" + _eventName + "\"}");
+				}
+			}
+		}
+		function updateName(_id) {
+			luaCmd("turtle:" + _id, "os.getComputerLabel()", "os.getComputerLabel()");
+		}
+		function setForceNames(value) {
+			var cururl = window.location.href;
+			if (cururl.includes("?forceNames=false")) {
+				window.location.replace(cururl.replace("?forceNames=false", "?forceNames=" + value.toString()));
+			}
+			else if (cururl.includes("?forceNames=true")) {
+				window.location.replace(cururl.replace("?forceNames=true", "?forceNames=" + value.toString()));
+			}
+			else {
+				window.location.replace(cururl + "?forceNames=" + value.toString());
+			}
+		}
+	</script>
+</head>
+
+<body>
+	<div id="status">Connecting...</div>
+	<br>
+	<div id="input">
+		<div id="all">
+			<div id="nameAll"><b>All</b> &nbsp &nbsp <label for="forceNames">Force names</label><input type="checkbox", onchange="forceNames = this.checked; setForceNames(this.checked);", name="forceNames"></input></div>
+			<p style="margin-left: 20px">
+				<input type="button", id="forward" value="Move forward", onclick="luaCmd('turtle:all', 'turtle.forward()', 'Move forward')">
+				<input type="button", id="up" value="Move up", onclick="luaCmd('turtle:all', 'turtle.up()', 'Move up')">
+			</p>
+			<input type="button", id="turnLeft" value="Turn left", onclick="luaCmd('turtle:all', 'turtle.turnLeft()', 'Turn left')">
+			<input type="button", id="turnRight" value="Turn right", onclick="luaCmd('turtle:all', 'turtle.turnRight()', 'Turn right')">
+			<p style="margin-left: 15px">
+				<input type="button", id="back" value="Move backward", onclick="luaCmd('turtle:all', 'turtle.back()', 'Move backward')">
+				<input type="button", id="down" value="Move down", onclick="luaCmd('turtle:all', 'turtle.down()', 'Move down')">
+			</p>
+			<input type="text", id="cmdAll", value="turtle.dig()"></input>
+			<input type="button", value="Execute code", onclick="luaCmd('turtle:all', document.getElementById('cmdAll').value, document.getElementById('cmdAll').value)"></input>
+			<br>
+		</div>
+	</div>
+</body>
+
+</html>
