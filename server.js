@@ -28,19 +28,22 @@ wss.on('connection', websocket => {
 			if (browserWS != null) {
 				if (!Pinging) {
 					Pinging = true;
-					for (let index = 0; index < minecraftWSs.length; index++) {
-						if (minecraftWSs[index] != null) {
-							turtlealive[index] = false;
-							minecraftWSs[index].send("{\"type\":\"ping\", \"id\":\"" + index + "\"}");
+					//how many times we should loop
+					var turtleindexes = [];
+					for (let index = 0; index < minecraftWSs.length; index++) { if (minecraftWSs[index] != null) {turtleindexes.push(index); } }
+					for (let index = 0; index < turtleindexes.length; index++) {
+						if (minecraftWSs[turtleindexes[index]] != null) {
+							turtlealive[turtleindexes[index]] = false;
+							minecraftWSs[turtleindexes[index]].send("{\"type\":\"ping\", \"id\":\"" + turtleindexes[index] + "\"}");
 						}
 					}
 					setTimeout(function () {
-						for (let index = 0; index < minecraftWSs.length; index++) {
-							if (turtlealive[index] == false) {
-								minecraftWSs[index] = null;
-								console.log("turtle" + (index + 1) + " disconnected.")
-								browserWS.send("{\"disconnection\":\"" + (index + 1) + "\"}");
-							} else { turtlealive[index] = false; }
+						for (let index = 0; index < turtleindexes.length; index++) {
+							if (turtlealive[turtleindexes[index]] == false) {
+								minecraftWSs[turtleindexes[index]] = null;
+								console.log("turtle" + (turtleindexes[index] + 1) + " disconnected.")
+								browserWS.send("{\"disconnection\":\"" + (turtleindexes[index] + 1) + "\"}");
+							} else { turtlealive[turtleindexes[index]] = false; }
 						}
 						Pinging = false;
 					}, 250);
@@ -118,7 +121,8 @@ const serverport = 80; //I would suggest leaving these options
 var allowedPaths = [
 	//main files
 	"js/Main.js",
-	"js/tools.js",
+	"js/Actions.js",
+	"js/Tools.js",
 	//three.js + camera control
 	"js/three.js",
 	"js/OrbitControls.js",
@@ -144,7 +148,7 @@ const requestListener = function (req, res) {
 	_url = url.parse(req.url, true);
 	var path = (_url.pathname).substring(1).split("&")[0];
 	if (path == "favicon.ico") { return; }
-	if (!allowedPaths.includes(path) && path.split("/")[0] != "textures") {
+	if (!allowedPaths.includes(path) && path.split("/")[0] != "textures" && path.split("/")[0] != "UI") {
 		parameters = _url.query;
 		path = "index" + path + ".html"
 	}

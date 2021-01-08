@@ -3,15 +3,99 @@
 
 <head>
     <style>
-        body { background-color: rgb(75, 75, 75); margin: 0; }
+        body { background-color: rgb(50, 50, 50); margin: 0; color: rgb(100, 100, 100) }
         h2 { text-align: center; }
-        up { margin-left: 12px }
-        turnLeft { margin-left: 18px; }
-        turnRight { margin-left: -4px; }
-        dig {word-spacing: -4px;}
-        dig {word-spacing: -4px;}
+        #input {
+            position: absolute;
+            display: block;
+            z-index: 99;
+            left: 0%;
+            top: 0%;
+        }
+        .button {
+            border: none;
+            display: inline-block;
+            margin: -2px;
+            cursor: pointer;
+            outline: none;
+        }
+        .button .tooltip {
+            visibility: hidden;
+            background-color: black;
+            color: #fff;
+            position: absolute;
+            margin: 6px;
+            z-index: 1;
+            font-size: 15;
+        }
+        .button:hover .tooltip{
+            visibility: visible;
+        }
+        .red { background-color: #d04040; }
+        .red:hover { background-color: #a82828; }
+        .red .tooltip { background-color: #a03030; color: #d04040; }
+        .green { background-color: #50c050; }
+        .green:hover { background-color: #409040; }
+        .green .tooltip { background-color: #409040; color: #50c050; }
+        .blue { background-color: #4040d0; }
+        .blue:hover { background-color: #4040b0; }
+        .blue .tooltip { background-color:#4040b0; color: #4848f0; }
+
+
+        #inventory {
+            position: absolute;
+            display: block;
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            z-index: 99;
+            font-size: 40;
+        }
+
+        #inventory .slot {
+            width: 64px;
+            height: 64px;
+            display: inline-block;
+            background-color: rgb(120, 120, 120);
+            position: relative;
+            font-size: inherit;
+            margin: -2px;
+            border: none;
+            outline: none;
+        }
+        
+        #inventory .slot:hover { background-color: rgb(90, 90, 90); }
+        #inventory .slot:hover .tooltip { visibility: visible; }
+
+        #inventory .slotSelected { 
+            width: 64px;
+            height: 64px;
+            display: inline-block;
+            background-color: rgb(150, 150, 150);
+            position: relative;
+            font-size: inherit;
+            margin: -2px;
+            border: none;
+            outline: none;
+        }
+        #inventory .slotSelected:hover { background-color: rgb(110, 110, 110); }
+        #inventory .slotSelected:hover .tooltip { visibility: visible; }
+
+        #inventory .tooltip {
+            visibility: hidden;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 99;
+            bottom: 33%;
+            left: -75%;
+            margin-left: -60px;
+        }
+
     </style>
-    <h2>Remote control turtles!!</h2>
     <script src="js/three.js"></script>
     <script src="js/OrbitControls.js"></script>
 
@@ -32,43 +116,76 @@
         <script src="js/SceneUtils.js"></script>
     </div>
 
-    <script src="js/tools.js"></script>
+    <script src="js/Tools.js"></script>
+    <script src="js/Actions.js"></script>
     <script src="js/Main.js"></script>
 </head>
 
 <body>
     <div id="input">
         <label for="turtles">Choose a turtle:</label>
-        <select onchange="setCurTurtle(this.value);" name="turtles" , id="selectTurtle"></select>
+        <select onchange="setCurTurtle(this.value);" name="turtles", id="selectTurtle"></select>
         &nbsp &nbsp
         <label for="forceNames">Force names: </label>
-        <input type="checkbox" , onchange="setForceNames(this.checked);" ,
+        <input type="checkbox", onchange="setForceNames(this.checked);" ,
             name="forceNames"></input>
-        <div id="status">Connecting...</div>
         <br>
-        <input type="text" , id="cmd" , value="turtle.dig()"></input><input type="button" , value="Execute code" ,
+        <input type="text", id="cmd", value="turtle.suckDown()"></input><input type="button", class="button blue", style="font-size: 20", value="Execute code" ,
             onclick="luaCmd(curid, document.getElementById('cmd').value, document.getElementById('cmd').value, 'customReturn')"></input>
-        <input type="text" , id="setNm" , value="turtle"></input><input type="button" , value="Set name", onclick="if (!forceNames && curid != 'all') {
+        <input type="text", id="setNm", style="font-size: 20", value="turtle"></input><input type="button", class="button green", value="Set name", onclick="if (!forceNames && curid != 'all') {
             luaCmd(curid, 'os.setComputerLabel(\'' + document.getElementById('setNm').value + '\')', 'os.setComputerLabel(\'' + document.getElementById('setNm').value + '\'), \'return\'');
             luaCmd(curid, 'os.getComputerLabel()', 'os.getComputerLabel()', 'name');
             curid = document.getElementById('selectTurtle').value;
-        }"></input><input type="button" , value="Clear name", onclick="if (!forceNames && curid != 'all') {
+        }"></input><input type="button", class="button red", style="font-size: 20", value="Clear name", onclick="if (!forceNames && curid != 'all') {
             luaCmd(curid, 'os.setComputerLabel(nil)', 'os.setComputerLabel(nil), \'return\'');
             luaCmd(curid, 'os.getComputerLabel()', 'os.getComputerLabel()', 'name');
             curid = document.getElementById('selectTurtle').value;
         }"></input>
         <br>
-        <input type="button" , id="forward" value="Move forward" , onclick="forward()">
-        <up><input type="button" , id="up" value="Move up" , onclick="up()"></up>
-        <turnLeft><input type="button" , id="turnLeft" value="Turn left" , onclick="turnLeft()"></turnLeft>
-        <turnRight><input type="button" , id="turnRight" value="Turn right" , onclick="turnRight()"></turnRight>
+        <button class="button blue", onclick="up()"> <img src="UI/upArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Move up</span> </button>
+        <button class="button blue", onclick="forward()"> <img src="UI/forwardArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Move forward</span> </button>
+        <button class="button green", onclick="placeUp()"> <img src="UI/placeUpArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Place up</span> </button>
+        <button class="button red", onclick="mineUp()"> <img src="UI/mineUpArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Mine up</span> </button>
+        <button class="button green", onclick="dropUp()"> <img src="UI/dropUpArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Drop up</span> </button>
+        <button class="button red", onclick="suckUp()"> <img src="UI/suckUpArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Suck up</span> </button>
         <br>
-        <input type="button" , id="back" value="Move backward" , onclick="back()">
-        <input type="button" , id="down" value="Move down" , onclick="down()">
-        <dig><input type="button" , id="digDown" value="Dig down" , onclick="digDown()">
-        <input type="button" , id="dig" value="Dig forward" , onclick="dig()">
-        <input type="button" , id="digUp" value="Dig up" , onclick="digUp()"></dig>
-        
+        <button class="button blue", onclick="turnLeft()"> <img src="UI/turnLeftArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Turn left</span> </button>
+        <button class="button blue", onclick="turnRight()"> <img src="UI/turnRightArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Turn right</span> </button>
+        <button class="button green", onclick="place()"> <img src="UI/placeForwardArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Place forward</span> </button>
+        <button class="button red", onclick="dig()"> <img src="UI/mineForwardArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Mine forward</span> </button>
+        <button class="button green", onclick="drop()"> <img src="UI/dropForwardArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Drop forward</span> </button>
+        <button class="button red", onclick="suck()"> <img src="UI/suckForwardArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Suck forward</span> </button>
+        <br>
+        <button class="button blue", onclick="down()"> <img src="UI/downArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Move down</span> </button>
+        <button class="button blue", onclick="back()"> <img src="UI/backArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Move back</span> </button>
+        <button class="button green", onclick="placeDown()"> <img src="UI/placeDownArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Place down</span> </button>
+        <button class="button red", onclick="digDown()"> <img src="UI/mineDownArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Mine down</span> </button>
+        <button class="button green", onclick="dropDown()"> <img src="UI/dropDownArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Drop down</span> </button>
+        <button class="button red", onclick="suckDown()"> <img src="UI/suckDownArrow.png", width="48px", height="48px", style="image-rendering: pixelated;"> <span class="tooltip">Suck down</span> </button>
+    </div>
+    <br>
+    <div id="inventory">
+        <button class="button blue", id="updateInventory", onclick="UpdateInv(curid, true)">Update inventory</button>
+        <br>
+        <button class="slotSelected", id="itemSlot1", onclick="selectSlot(1)">0</button>
+        <button class="slot", id="itemSlot2", onclick="selectSlot(2)">0</button>
+        <button class="slot", id="itemSlot3", onclick="selectSlot(3)">0</button>
+        <button class="slot", id="itemSlot4", onclick="selectSlot(4)">0</button>
+        <br>
+        <button class="slot", id="itemSlot5", onclick="selectSlot(5)">0</button>
+        <button class="slot", id="itemSlot6", onclick="selectSlot(6)">0</button>
+        <button class="slot", id="itemSlot7", onclick="selectSlot(7)">0</button>
+        <button class="slot", id="itemSlot8", onclick="selectSlot(8)">0</button>
+        <br>
+        <button class="slot", id="itemSlot9", onclick="selectSlot(9)">0</button>
+        <button class="slot", id="itemSlot10", onclick="selectSlot(10)">0</button>
+        <button class="slot", id="itemSlot11", onclick="selectSlot(11)">0</button>
+        <button class="slot", id="itemSlot12", onclick="selectSlot(12)">0</button>
+        <br>
+        <button class="slot", id="itemSlot13", onclick="selectSlot(13)">0</button>
+        <button class="slot", id="itemSlot14", onclick="selectSlot(14)">0</button>
+        <button class="slot", id="itemSlot15", onclick="selectSlot(15)">0</button>
+        <button class="slot", id="itemSlot16", onclick="selectSlot(16)">0</button>
     </div>
 </body>
 
