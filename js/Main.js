@@ -4,7 +4,7 @@ scene.add(light);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.z = 5;
 const renderer = new THREE.WebGLRenderer({ alpha: true });
-renderer.setSize(window.innerWidth * 0.8, window.innerHeight * 0.8);
+renderer.setSize(window.innerWidth * 0.98, window.innerHeight * 0.98);
 document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 
@@ -26,10 +26,10 @@ var blocks = []
 var blockDirections = []
 
 var returnNum;
-//change {port} to a number but leave {ipAddr} as it is
+
+//leave ipAddr as it is but change {port} to the port the web socket is using
 ws = new WebSocket("ws://{ipAddr}:{port}");
 ws.onopen = function () {
-    document.getElementById("status").innerHTML = "Connected!!";
     ws.send("{\"type\":\"connection\",\"connection\":\"browser\"}");
     setonmessage();
 };
@@ -64,18 +64,44 @@ function setonmessage() {
                 _return: {},
                 _evntNm: null,
                 model: null,
-                offset: 0
+                offset: 0,
+                items: [],
+                selectedSlot: 1,
+                queue: [],
+                callingqueue: false,
+                callQueue: function () {
+                    if (!this.callingqueue && this.queue.length != 0) {
+                        this.callingqueue = true;
+                        var _function = this.queue[0];
+                        this.queue.splice(this.queue.indexOf(_function), 1);
+                        _function();
+                    }
+                }
             };
-            if (forceNames) { luaCmd(msg.connection, "os.setComputerLabel('turtle" + msg.connection + "')", "os.setComputerLabel('turtle" + msg.connection + "')", "false"); }
-            luaCmd(msg.connection, "os.getComputerLabel()", "os.getComputerLabel()", "name");
-            if (curid == msg.connection) { turtles[curid].canAct = false; UpdateBlcks(); }
+
+            if (curid == msg.connection) { UpdateBlcks(false); }
+            selectSlot(1, false);
+            if (forceNames) {
+                turtles[msg.connection].queue.push(function () {
+                    luaCmd(msg.connection, "os.setComputerLabel('turtle" + msg.connection + "')", "os.setComputerLabel('turtle" + msg.connection + "')", "false");
+                    if (turtles[msg.connection].queue.length != 0) { turtles[msg.connection].callQueue(); } else { turtles[id].callingqueue = false; }
+                });
+            }
+            turtles[msg.connection].queue.push(function () {
+                luaCmd(msg.connection, "os.getComputerLabel()", "os.getComputerLabel()", "name");
+                if (turtles[msg.connection].queue.length != 0) { turtles[msg.connection].callingqueue = false; turtles[msg.connection].callQueue(); } else { turtles[msg.connection].callingqueue = false; }
+            });
+            UpdateInv(msg.connection, false);
+
+            turtles[msg.connection].callQueue();
         } else if (msg.disconnection != null) {
             if (turtles[msg.disconnection] != null) {
                 console.log("Turtle" + msg.disconnection + " disconnected.");
                 html = document.getElementById("selectTurtle").innerHTML.replace("<option value=\"" + msg.disconnection + "\">" + turtles[msg.disconnection].name + "</option>", "");
-
                 document.getElementById("selectTurtle").innerHTML = html;
+                //remove blocks from scene               
                 if (blocks[msg.disconnection] != null) {
+                    //remove blocks from scene
                     for (let index = 0; index < blocks[msg.disconnection].length; index++) {
                         pos = blocks[msg.disconnection][index].split(", ");
                         worlds[msg.disconnection] = null;
@@ -85,39 +111,52 @@ function setonmessage() {
                     }
                     blocks[msg.disconnection] = null;
                 }
-                scene.remove(turtles[msg.disconnection].model);
-                updateCameraPos(turtles[msg.disconnection].x, turtles[msg.disconnection].y, turtles[msg.disconnection].z, 0, 0, 0);
+                //remove turtle from scene
+                if (msg.disconnection == curid) { scene.remove(turtles[msg.disconnection].model); }
+                if (turtles[msg.disconnection].curIntrvlId != null) { clearInterval(turtles[msg.disconnection].curIntrvlId) }
                 turtles[msg.disconnection] = null;
 
+                if (document.getElementById("selectTurtle").value != curid) {
+                    curid = document.getElementById("selectTurtle").value;
+                    //add new current turtle to scene
+                    if (turtles[curid] != null) {
+                        turtles[curid].model.position.set(turtles[curid].x, turtles[curid].y, turtles[curid].z);
+                        scene.add(turtles[curid].model);
+                        updateCameraPos(turtles[curid].x, turtles[curid].y, turtles[curid].z, turtles[curid].x, turtles[curid].y, turtles[curid].z)
+                        
+                        for (let index = 1; index < 17; index++) {
+                            var item = turtles[curid].items[index].count;
+                            if (item.name != null) {
+                                document.getElementById("itemSlot" + index).innerHTML = turtles[curid].items[index].count + " <span class=\"tooltip\">" + item.name + "/" + item.damage + "</span> ";
+                            } else { document.getElementById("itemSlot" + index).innerHTML = turtles[curid].items[index].count; }
+                        }
 
-                curid = document.getElementById("selectTurtle").value;
-                if (blocks[curid] != null) {
-                    for (let index = 0; index < blocks[curid].length; index++) {
-                        pos = blocks[curid][index].split(", ");
-                        if (blockDirections[curid][pos[0]][pos[1]][pos[2]] != null) {
-                            var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
-                        } else { var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], null); }
-                        cube[0].position.x = pos[0];
-                        cube[0].position.y = pos[1];
-                        cube[0].position.z = -parseInt(pos[2]);
-                        cube[0].name = "Cube, " + blocks[curid][index];
-                        scene.add(cube[0]);
-                        if (cube[1] != null) {
-                            var edges = new THREE.EdgesGeometry(cube[1]);
-                            var line = new THREE.LineSegments(edges, lineMaterial);
-                            line.position.x = pos[0];
-                            line.position.y = pos[1];
-                            line.position.z = -parseInt(pos[2]);
-                            line.name = "Line, " + blocks[curid][index];
-                            scene.add(line);
+                        UpdateBlcks(false);
+                        turtles[curid].callQueue();
+                    }
+                    //add new blocks to scene (if there are any that need to be added)
+                    if (blocks[curid] != null) {
+                        for (let index = 0; index < blocks[curid].length; index++) {
+                            pos = blocks[curid][index].split(", ");
+                            if (blockDirections[curid][pos[0]][pos[1]][pos[2]] != null) {
+                                var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
+                            } else { var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], null); }
+                            cube[0].position.x = pos[0];
+                            cube[0].position.y = pos[1];
+                            cube[0].position.z = -parseInt(pos[2]);
+                            cube[0].name = "Cube, " + blocks[curid][index];
+                            scene.add(cube[0]);
+                            if (cube[1] != null) {
+                                var edges = new THREE.EdgesGeometry(cube[1]);
+                                var line = new THREE.LineSegments(edges, lineMaterial);
+                                line.position.x = pos[0];
+                                line.position.y = pos[1];
+                                line.position.z = -parseInt(pos[2]);
+                                line.name = "Line, " + blocks[curid][index];
+                                scene.add(line);
+                            }
                         }
                     }
-                } if (turtles[curid] != null) {
-                    turtles[curid].model.position.set(turtles[curid].x, turtles[curid].y, turtles[curid].z);
-                    scene.add(turtles[curid].model);
-                    updateCameraPos(turtles[curid].x, turtles[curid].y, turtles[curid].z, turtles[curid].x, turtles[curid].y, turtles[curid].z)
-                    turtles[curid].canAct = false;
-                    UpdateBlcks();
                 }
             }
         } else if (msg.rtrnTyp != null) {
@@ -168,16 +207,16 @@ function luaCmdReturnSpecific(id, cmd, _eventName, returnType, callback) {
 function checkreturn(_eventName, num, id, variable, callback) {
     if (variable) {
         returnNum = num;
-        if (turtles[id].curIntrvlId == null) { turtles[id].curIntrvlId = setInterval(checkreturn, 150, _eventName, null, id, false, callback); }
+        if (turtles[id] != null && turtles[id].curIntrvlId == null) { turtles[id].curIntrvlId = setInterval(checkreturn, 150, _eventName, null, id, false, callback); }
     } else {
-        if ((turtles[id]._return[0] != null && _eventName == turtles[id]._evntNm)) {
+        if (turtles[id] != null && turtles[id]._return[0] != null && _eventName == turtles[id]._evntNm) {
             turtles[id]._evntNm = null;
             var returnVal;
             returnVal = turtles[id]._return;
             turtles[id]._return = {};
             clearInterval(turtles[id].curIntrvlId);
             turtles[id].curIntrvlId = null;
-            callback(returnVal, id);
+            callback(returnVal, id, _eventName);
         } else if (returnNum == 0) {
             clearInterval(turtles[id].curIntrvlId);
             turtles[id].curIntrvlId = null;
@@ -330,76 +369,72 @@ function updateTurtlePos(id) {
     turtles[id].model.position.set(turtles[id].x, turtles[id].y, -turtles[id].z);
     turtles[id].model.rotation.y = (-(Math.PI / 2) * turtles[id].d) - (Math.PI / 2);
 }
-function UpdateBlcks() {
-    luaCmdReturn("turtle.inspectUp()", "Get block up", "returnSilent", function (returnVal, id) {
-        if (returnVal != null) {
-            if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                setBlockDir("up", returnVal[1], id);
-            } else { setBlockDir("up", "minecraft|air", id); }
-            luaCmdReturnSpecific(id, "turtle.inspectDown()", "Get block down", "returnSilent", function (returnVal, id) {
-                if (returnVal != null) {
-                    if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                        setBlockDir("down", returnVal[1], id);
-                    } else { setBlockDir("down", "minecraft|air", id); }
-                    luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
+function UpdateBlcks(callqueue) {
+    turtles[curid].queue.push(function () {
+        luaCmdReturnSpecific(curid, "turtle.inspectUp()", "Get block up", "returnSilent", function (returnVal, id, evntNm) {
+            if (returnVal != null) {
+                if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
+                    setBlockDir("up", returnVal[1], id);
+                } else { setBlockDir("up", "minecraft|air", id); }
+            } else { console.log("Turtle took to long to respond."); }
+            if (turtles[id].queue.length != 0) { turtles[id].callingqueue = false; turtles[id].callQueue(); } else { turtles[id].callingqueue = false; }
+        });
+    });
+    turtles[curid].queue.push(function () {
+        luaCmdReturnSpecific(curid, "turtle.inspectDown()", "Get block down", "returnSilent", function (returnVal, id, evntNm) {
+            if (returnVal != null) {
+                if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
+                    setBlockDir("down", returnVal[1], id);
+                } else { setBlockDir("down", "minecraft|air", id); }
+            } else { console.log("Turtle took to long to respond."); }
+            if (turtles[id].queue.length != 0) { turtles[id].callingqueue = false; turtles[id].callQueue(); } else { turtles[id].callingqueue = false; }
+        });
+    });
+
+    var actions = "inspect:turnRight:inspect:turnRight:inspect:turnRight:inspect:turnRight".split(":");
+    for (let index = 0; index < actions.length; index++) {
+        switch (actions[index]) {
+            case "inspect":
+                turtles[curid].queue.push(function () {
+                    luaCmdReturnSpecific(curid, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id, evntNm) {
                         if (returnVal != null) {
                             if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                                 setBlockDir("forward", returnVal[1], id);
                             } else { setBlockDir("forward", "minecraft|air", id); }
-                            luaCmdReturnSpecific(id, "turtle.turnRight()", "Turn Right", "returnSilent", function (returnVal, id) {
-                                if (returnVal != null) {
-                                    if (returnVal[0] = "true") {
-                                        turtles[id].d = (turtles[id].d + 5) % 4;
-                                        updateTurtlePos(id);
-                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
-                                            if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                                                setBlockDir("forward", returnVal[1], id);
-                                            } else { setBlockDir("forward", "minecraft|air", id); }
-                                            luaCmdReturnSpecific(id, "turtle.turnRight()", "Turn Right", "returnSilent", function (returnVal, id) {
-                                                if (returnVal != null) {
-                                                    if (returnVal[0] = "true") {
-                                                        turtles[id].d = (turtles[id].d + 5) % 4;
-                                                        updateTurtlePos(id);
-                                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
-                                                            if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                                                                setBlockDir("forward", returnVal[1], id);
-                                                            } else { setBlockDir("forward", "minecraft|air", id); }
-                                                            luaCmdReturnSpecific(id, "turtle.turnRight()", "Turn Right", "returnSilent", function (returnVal, id) {
-                                                                if (returnVal != null) {
-                                                                    if (returnVal[0] = "true") {
-                                                                        turtles[id].d = (turtles[id].d + 5) % 4;
-                                                                        updateTurtlePos(id);
-                                                                        luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
-                                                                            if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                                                                                setBlockDir("forward", returnVal[1], id);
-                                                                            } else { setBlockDir("forward", "minecraft|air", id); }
-                                                                            luaCmdReturnSpecific(id, "turtle.turnRight()", "Turn Right", "returnSilent", function (returnVal, id) {
-                                                                                if (returnVal != null) {
-                                                                                    if (returnVal[0] = "true") {
-                                                                                        turtles[id].d = (turtles[id].d + 5) % 4;
-                                                                                        updateTurtlePos(id);
-                                                                                        turtles[id].canAct = true;
-                                                                                    } else { console.log("Turn right failed while trying to update blocks."); turtles[id].canAct = true; }
-                                                                                } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
-                                                                            });
-                                                                        });
-                                                                    } else { console.log("Turn right failed while trying to update blocks."); turtles[id].canAct = true; }
-                                                                } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
-                                                            });
-                                                        });
-                                                    } else { console.log("Turn right failed while trying to update blocks."); turtles[id].canAct = true; }
-                                                } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
-                                            });
-                                        });
-                                    } else { console.log("Turn right failed while trying to update blocks."); turtles[id].canAct = true; }
-                                } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
-                            });
-                        } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
+                        } else { console.log("Turtle took to long to respond."); }
+                        if (turtles[id].queue.length != 0) { turtles[id].callingqueue = false; turtles[id].callQueue(); } else { turtles[id].callingqueue = false; }
                     });
-                } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
+                });
+                break;
+            case "turnRight":
+                turtles[curid].queue.push(function () {
+                    luaCmdReturnSpecific(curid, "turtle.turnRight()", "Turn Right", "returnSilent", function (returnVal, id, evntNm) {
+                        if (returnVal != null) {
+                            if (returnVal[0] == "true") {
+                                turtles[id].d = (turtles[id].d + 5) % 4;
+                                updateTurtlePos(id);
+                            } else { console.log("Turn right failed while trying to update blocks."); }
+                        } else { console.log("Turtle took to long to respond."); }
+                        if (turtles[id].queue.length != 0) { turtles[id].callingqueue = false; turtles[id].callQueue(); } else { turtles[id].callingqueue = false; }
+                    });
+                });
+                break;
+        }
+    }
+    if (callqueue != false) { turtles[curid].callQueue(); }
+}
+function UpdateInv(_id, callqueue) {
+    for (let index = 1; index < 17; index++) {
+        turtles[_id].queue.push(function () {
+            luaCmdReturnSpecific(_id, "turtle.getItemDetail(" + index + ")", "Get slot " + index, "returnSilent", function (returnVal, id, evntNm) {
+                if (returnVal != null) {
+                    if (returnVal[0] != "nil") { setSlot(id, evntNm.split(" ")[2], JSON.parse(returnVal[0].replaceAll("|", ":"))); } else { setSlot(id, evntNm.split(" ")[2], null); }
+                } else { console.log("Turtle took to long to respond."); }
+                if (turtles[id].queue.length != 0) { turtles[id].callingqueue = false; turtles[id].callQueue(); } else { turtles[id].callingqueue = false; }
             });
-        } else { console.log("Turtle took to long to respond."); turtles[id].canAct = true; }
-    });
+        });
+    }
+    if (callqueue != false) { turtles[_id].callQueue(); }
 }
 
 
@@ -428,7 +463,7 @@ function setOffset() {
             case 3: if (worlds[curid][x + 1] != null && worlds[curid][x + 1][y - 1] != null && worlds[curid][x + 1][z] != null) { isNull = (worlds[curid][x + 1][y - 1][z] == null); } break;
         }
         if (!isNull) {
-            luaCmdReturn("turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
+            luaCmdReturn("turtle.inspect()", "Get block", "returnSilent", function (returnVal, id, evntNm) {
                 if (returnVal != null) {
                     if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
                         var BlkId = returnVal[1].replaceAll("|", ":");
@@ -461,17 +496,23 @@ function setCurTurtle(value) {
         }
     }
     scene.remove(turtles[curid].model);
+
+    //add new turtle
+    updateCameraPos(turtles[curid].x, turtles[curid].y, turtles[curid].z, turtles[value].x, turtles[value].y, turtles[value].z);
+    curid = value;
+    turtles[curid].model.position.set(turtles[curid].x, turtles[curid].y, turtles[curid].z);
+    scene.add(turtles[curid].model);
     //create new  world
-    if (blocks[value] != null) {
-        for (let index = 0; index < blocks[value].length; index++) {
-            pos = blocks[value][index].split(", ");
+    if (blocks[curid] != null) {
+        for (let index = 0; index < blocks[curid].length; index++) {
+            pos = blocks[curid][index].split(", ");
             if (blockDirections[curid][pos[0]][pos[1]][pos[2]] != null) {
-                var cube = getCube(worlds[value][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
-            } else { var cube = getCube(worlds[value][pos[0]][pos[1]][pos[2]], null); }
+                var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], blockDirections[curid][pos[0]][pos[1]][pos[2]]);
+            } else { var cube = getCube(worlds[curid][pos[0]][pos[1]][pos[2]], null); }
             cube[0].position.x = pos[0];
             cube[0].position.y = pos[1];
             cube[0].position.z = -parseInt(pos[2]);
-            cube[0].name = "Cube, " + blocks[value][index];
+            cube[0].name = "Cube, " + blocks[curid][index];
             scene.add(cube[0]);
             if (cube[1] != null) {
                 var edges = new THREE.EdgesGeometry(cube[1]);
@@ -479,17 +520,23 @@ function setCurTurtle(value) {
                 line.position.x = pos[0];
                 line.position.y = pos[1];
                 line.position.z = -parseInt(pos[2]);
-                line.name = "Line, " + blocks[value][index];
+                line.name = "Line, " + blocks[curid][index];
                 scene.add(line);
             }
         }
     }
-    turtles[value].model.position.set(turtles[value].x, turtles[value].y, turtles[value].z);
-    scene.add(turtles[value].model);
-    updateCameraPos(turtles[curid].x, turtles[curid].y, turtles[curid].z, turtles[value].x, turtles[value].y, turtles[value].z);
-    curid = value;
-    turtles[curid].canAct = false;
-    UpdateBlcks();
+
+    for (let index = 1; index < 17; index++) {
+        var item = turtles[curid].items[index].count;
+        if (item.name != null) {
+            document.getElementById("itemSlot" + index).innerHTML = turtles[curid].items[index].count + " <span class=\"tooltip\">" + item.name + "/" + item.damage + "</span> ";
+        } else { document.getElementById("itemSlot" + index).innerHTML = turtles[curid].items[index].count; }
+    }
+    document.getElementsByClassName("slotSelected")[0].className = "slot";
+    document.getElementById("itemSlot" + turtles[curid].selectedSlot).className = "slotSelected";
+
+    UpdateBlcks(false);
+    turtles[curid].callQueue();
 }
 function setBlock(x, y, z, BlkId, trtlId, direction) {
     //remove block from scene
@@ -544,13 +591,15 @@ function setBlockDir(dir, id, trtlId) {
     var BlkId = id.replaceAll("|", ":");
     if (BlkId != "minecraft:air") {
         json = JSON.parse(BlkId);
-        if (json.state != null && json.state.variant != null) {
-            BlkId = json.name + "/" + json.state.variant;
-        } else if (json.state != null && json.state.type != null) {
-            BlkId = json.name + "/type:" + json.state.type;
-        } else {
-            BlkId = json.name;
-        } if (json.state != null) {
+        if (json.state != null) {
+            if (json.state.variant != null) {
+                BlkId = json.name + "/" + json.state.variant;
+            } else if (json.state.type != null) {
+                BlkId = json.name + "/type:" + json.state.type;
+            } else { BlkId = json.name; }
+
+            if (json.state.color != null) { BlkId += "/color:" + json.state.color; }
+
             if (json.state.facing != null) {
                 direction = json.state.facing;
             } else if (json.state.axis != null) { direction = json.state.axis; }
@@ -574,151 +623,31 @@ function setBlockDir(dir, id, trtlId) {
         }
     }
 }
+function setSlot(trtlId, slotId, value) {
+    if (value != null) {
+        turtles[trtlId].items[slotId] = value;
+        if (trtlId == curid) { document.getElementById("itemSlot" + slotId).innerHTML = value.count + " <span class=\"tooltip\">" + value.name + "/" + value.damage + "</span> "; }
+    }
+    else {
+        turtles[trtlId].items[slotId] = { damage: 0, name: null, count: 0 };
+        if (trtlId == curid) { document.getElementById("itemSlot" + slotId).innerHTML = "0"; }
+    }
+}
 
 
-function forward() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.forward()", "Move forward", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                x = turtles[id].x;
-                y = turtles[id].y;
-                z = turtles[id].z;
-                switch (turtles[id].d) {
-                    case 0: turtles[id].z--; break;
-                    case 1: turtles[id].x--; break;
-                    case 2: turtles[id].z++; break;
-                    case 3: turtles[id].x++; break;
+function selectSlot(slot, callqueue) {
+    turtles[curid].queue.push(function () {
+        luaCmdReturn("turtle.select(" + slot + ")", "Select slot " + slot, "returnSilent", function (returnVal, id, evntNm) {
+            if (returnVal != null) {
+                if (returnVal[0] == "true") {
+                    turtles[id].selectedSlot = slot;
+                    if (id == curid) { document.getElementsByClassName("slotSelected")[0].className = "slot"; document.getElementById("itemSlot" + slot).className = "slotSelected"; }
+                    if (turtles[id].queue.length != 0) { turtles[id].callingqueue = false; turtles[id].callQueue(); } else { turtles[id].callingqueue = false; }
                 }
-                updateCameraPos(x, y, z, turtles[id].x, turtles[id].y, turtles[id].z);
-                if (curid == id) { updateTurtlePos(id); }
-                UpdateBlcks();
-            } else { turtles[id].canAct = true; }
+            }
         });
-    } else { console.log("You can't act right now."); }
-}
-function back() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.back()", "Move backward", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                x = turtles[id].x;
-                y = turtles[id].y;
-                z = turtles[id].z;
-                switch (turtles[id].d) {
-                    case 0: turtles[id].z++; break;
-                    case 1: turtles[id].x++; break;
-                    case 2: turtles[id].z--; break;
-                    case 3: turtles[id].x--; break;
-                }
-                updateCameraPos(x, y, z, turtles[id].x, turtles[id].y, turtles[id].z);
-                if (curid == id) { updateTurtlePos(id); }
-                UpdateBlcks();
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-function up() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.up()", "Move up", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                turtles[id].y++;
-                updateCameraPos(turtles[id].x, turtles[id].y - 1, turtles[id].z, turtles[id].x, turtles[id].y, turtles[id].z);
-                if (curid == id) { updateTurtlePos(id); }
-                UpdateBlcks();
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-function down() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.down()", "Move down", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                turtles[id].y--;
-                updateCameraPos(turtles[id].x, turtles[id].y + 1, turtles[id].z, turtles[id].x, turtles[id].y, turtles[id].z);
-                if (curid == id) { updateTurtlePos(id); }
-                UpdateBlcks();
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-function turnLeft() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.turnLeft()", "Turn left", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                turtles[id].d = (turtles[id].d + 3) % 4;
-                turtles[id].canAct = true;
-                if (curid == id) { updateTurtlePos(id); }
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-function turnRight() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.turnRight()", "Turn right", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                turtles[id].d = (turtles[id].d + 5) % 4;
-                turtles[curid].canAct = true;
-                if (curid == id) { updateTurtlePos(id); }
-            } else { turtles[curid].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-
-function digUp() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.digUp()", "Dig", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                luaCmdReturnSpecific(id, "turtle.inspectUp()", "Get block up", "returnSilent", function (returnVal, id) {
-                    if (returnVal != null) {
-                        if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                            setBlockDir("up", returnVal[1], id);
-                        } else { setBlockDir("up", "minecraft|air", id); }
-                        turtles[id].canAct = true;
-                    }
-                });
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-function dig() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.dig()", "Dig forward", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                luaCmdReturnSpecific(id, "turtle.inspect()", "Get block", "returnSilent", function (returnVal, id) {
-                    if (returnVal != null) {
-                        if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                            setBlockDir("forward", returnVal[1], id);
-                        } else { setBlockDir("forward", "minecraft|air", id); }
-                        turtles[id].canAct = true;
-                    }
-                });
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
-}
-function digDown() {
-    if (turtles[curid].canAct) {
-        turtles[curid].canAct = false;
-        luaCmdReturn("turtle.digDown()", "Dig", "return", function (returnVal, id) {
-            if (returnVal != null && returnVal[0] == "true") {
-                luaCmdReturnSpecific(id, "turtle.inspectDown()", "Get block down", "returnSilent", function (returnVal, id) {
-                    if (returnVal != null) {
-                        if (returnVal[0] != "false" && returnVal[1] != "nil" && returnVal[1] != "No block to inspect") {
-                            setBlockDir("down", returnVal[1], id);
-                        } else { setBlockDir("down", "minecraft|air", id); }
-                        turtles[id].canAct = true;
-                    }
-                });
-            } else { turtles[id].canAct = true; }
-        });
-    } else { console.log("You can't act right now."); }
+    });
+    if (callqueue != false) { turtles[curid].callQueue(); }
 }
 
 

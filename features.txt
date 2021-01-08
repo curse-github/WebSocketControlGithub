@@ -1,0 +1,4 @@
+moving (all directions)
+breaking
+setting offset
+rotated blocks
